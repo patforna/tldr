@@ -29,12 +29,33 @@ def is_youtube(url: str) -> bool:
     return bool(re.search(r"(youtube\.com|youtu\.be)", url))
 
 
+def _fetch_youtube_title(url: str) -> str | None:
+    """Fetch YouTube video title via yt-dlp."""
+    result = subprocess.run(
+        ["yt-dlp", "--get-title", "--no-download", url],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0 and result.stdout.strip():
+        return result.stdout.strip()
+    return None
+
+
+def _extract_html_title(html: str) -> str | None:
+    """Extract <title> from HTML."""
+    m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+    return m.group(1).strip() if m else None
+
+
 def fetch_youtube_transcript(url: str) -> str:
     """Fetch YouTube transcript, trying youtube-transcript-api first, then yt-dlp."""
     video_id = extract_video_id(url)
     if not video_id:
         print(f"error: could not extract video ID from {url}", file=sys.stderr)
         sys.exit(1)
+
+    title = _fetch_youtube_title(url)
+    if title:
+        status(title)
 
     # Try youtube-transcript-api first
     status("fetching transcript...")
@@ -103,6 +124,10 @@ def fetch_article_text(url: str) -> str:
     if not downloaded:
         print(f"error: could not fetch {url}", file=sys.stderr)
         sys.exit(1)
+
+    title = _extract_html_title(downloaded)
+    if title:
+        status(title)
 
     status("extracting text...")
     text = trafilatura.extract(downloaded)
