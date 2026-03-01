@@ -168,7 +168,7 @@ def main():
         description="Summarise YouTube videos and articles via Claude.",
     )
     parser.add_argument("url", help="URL to summarise (YouTube video or article)")
-    parser.add_argument("-m", "--model", default="sonnet", help="claude model to use (default: sonnet)")
+    parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     args = parser.parse_args()
 
     if is_youtube(args.url):

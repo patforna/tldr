@@ -16,7 +16,7 @@ tldr <url> [-m MODEL]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-m`, `--model` | `sonnet` | Claude model (`haiku`, `sonnet`, `opus`) |
+| `-m`, `--model` | `opus` | Claude model (`haiku`, `sonnet`, `opus`) |
 
 ## Examples
 
