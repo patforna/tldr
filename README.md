@@ -34,5 +34,5 @@ To run from anywhere, add a wrapper script somewhere on your `PATH`:
 
 ```bash
 #!/usr/bin/env bash
-cd /path/to/tldr && exec uv run python -m tldr "$@"
+cd /path/to/tldr && uv run python -m tldr "$@"
 ```
