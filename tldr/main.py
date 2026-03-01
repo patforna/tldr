@@ -29,21 +29,34 @@ def is_youtube(url: str) -> bool:
     return bool(re.search(r"(youtube\.com|youtu\.be)", url))
 
 
-def _fetch_youtube_title(url: str) -> str | None:
-    """Fetch YouTube video title via yt-dlp."""
+def _fetch_youtube_meta(url: str) -> tuple[str | None, str | None]:
+    """Fetch YouTube video title and upload date via yt-dlp."""
     result = subprocess.run(
-        ["yt-dlp", "--get-title", "--no-download", url],
+        ["yt-dlp", "--print", "%(title)s", "--print", "%(upload_date>%Y-%m-%d)s",
+         "--no-download", url],
         capture_output=True, text=True,
     )
     if result.returncode == 0 and result.stdout.strip():
-        return result.stdout.strip()
-    return None
+        lines = result.stdout.strip().splitlines()
+        title = lines[0] if lines else None
+        date = lines[1] if len(lines) > 1 and lines[1] != "NA" else None
+        return title, date
+    return None, None
 
 
 def _extract_html_title(html: str) -> str | None:
     """Extract <title> from HTML."""
     m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
     return m.group(1).strip() if m else None
+
+
+def _extract_html_date(html: str) -> str | None:
+    """Extract publish date from HTML via htmldate."""
+    try:
+        from htmldate import find_date
+        return find_date(html)
+    except Exception:
+        return None
 
 
 def fetch_youtube_transcript(url: str) -> str:
@@ -53,9 +66,9 @@ def fetch_youtube_transcript(url: str) -> str:
         print(f"error: could not extract video ID from {url}", file=sys.stderr)
         sys.exit(1)
 
-    title = _fetch_youtube_title(url)
+    title, date = _fetch_youtube_meta(url)
     if title:
-        status(title)
+        status(f"{title} ({date})" if date else title)
 
     # Try youtube-transcript-api first
     status("fetching transcript...")
@@ -127,7 +140,8 @@ def fetch_article_text(url: str) -> str:
 
     title = _extract_html_title(downloaded)
     if title:
-        status(title)
+        date = _extract_html_date(downloaded)
+        status(f"{title} ({date})" if date else title)
 
     status("extracting text...")
     text = trafilatura.extract(downloaded)
