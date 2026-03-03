@@ -1,0 +1,6 @@
+services:
+  tldr:
+    build: .
+    volumes:
+      - ${HOME}/.claude.json:/root/.claude.json:ro
+      - ${HOME}/.claude:/root/.claude:rw

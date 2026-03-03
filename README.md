@@ -28,6 +28,8 @@ tldr "https://example.com/deep-dive" -m sonnet
 
 ## Install
 
+### Local
+
 Requires [uv](https://docs.astral.sh/uv/) and [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 To run from anywhere, add a wrapper script somewhere on your `PATH`:
@@ -36,3 +38,16 @@ To run from anywhere, add a wrapper script somewhere on your `PATH`:
 #!/usr/bin/env bash
 cd /path/to/tldr && uv run python -m tldr "$@"
 ```
+
+### Docker
+
+```bash
+docker compose run --rm tldr 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+```
+To run from anywhere, add a wrapper script somewhere on your `PATH`:
+
+```bash
+#!/usr/bin/env bash
+docker compose -f /path/to/tldr/docker-compose.yml run --rm tldr "$@"
+```
+
