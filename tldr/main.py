@@ -74,9 +74,11 @@ def fetch_youtube_transcript(url: str) -> str:
     status("fetching transcript...")
     try:
         ytt_api = YouTubeTranscriptApi()
-        for t in ytt_api.list(video_id):
-            transcript = t.fetch()
-            return " ".join(snippet.text for snippet in transcript.snippets)
+        try:
+            transcript = ytt_api.fetch(video_id, languages=["en"])
+        except Exception:
+            transcript = next(iter(ytt_api.list(video_id))).fetch()
+        return " ".join(snippet.text for snippet in transcript.snippets)
     except Exception as e:
         status(f"transcript api failed ({e}), trying yt-dlp...")
 
@@ -92,6 +94,7 @@ def _fetch_transcript_ytdlp(url: str) -> str:
             "yt-dlp",
             "--write-subs",
             "--write-auto-sub",
+            "--sub-lang", "en",
             "--sub-format", "vtt",
             "--skip-download",
             "-o", out_template,
@@ -102,13 +105,14 @@ def _fetch_transcript_ytdlp(url: str) -> str:
             print(f"error: yt-dlp failed: {result.stderr}", file=sys.stderr)
             sys.exit(1)
 
-        # Find the subtitle file
+        # Find the subtitle file, prefer English
         sub_files = list(Path(tmpdir).glob("*.vtt"))
         if not sub_files:
             print("error: no subtitle file produced by yt-dlp", file=sys.stderr)
             sys.exit(1)
 
-        return _parse_vtt(sub_files[0].read_text())
+        en_files = [f for f in sub_files if ".en" in f.name]
+        return _parse_vtt((en_files[0] if en_files else sub_files[0]).read_text())
 
 
 def _parse_vtt(vtt_content: str) -> str:
@@ -186,7 +190,7 @@ def main():
     parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
     args = parser.parse_args()
-    url = args.url.replace("\\", "")  # strip shell escapes
+    url = re.sub(r'\\([?=&])', r'\1', args.url)  # strip shell escapes
 
     if is_youtube(url):
         text = fetch_youtube_transcript(url)
