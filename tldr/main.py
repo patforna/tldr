@@ -185,11 +185,12 @@ def main():
     parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
     args = parser.parse_args()
+    url = args.url.replace("\\", "")  # strip shell escapes
 
-    if is_youtube(args.url):
-        text = fetch_youtube_transcript(args.url)
+    if is_youtube(url):
+        text = fetch_youtube_transcript(url)
     else:
-        text = fetch_article_text(args.url)
+        text = fetch_article_text(url)
 
     if args.keep:
         Path("tldr_content.txt").write_text(text)
