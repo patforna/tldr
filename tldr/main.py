@@ -74,8 +74,9 @@ def fetch_youtube_transcript(url: str) -> str:
     status("fetching transcript...")
     try:
         ytt_api = YouTubeTranscriptApi()
-        transcript = ytt_api.fetch(video_id, languages=["en"])
-        return " ".join(snippet.text for snippet in transcript.snippets)
+        for t in ytt_api.list(video_id):
+            transcript = t.fetch()
+            return " ".join(snippet.text for snippet in transcript.snippets)
     except Exception as e:
         status(f"transcript api failed ({e}), trying yt-dlp...")
 
@@ -89,8 +90,8 @@ def _fetch_transcript_ytdlp(url: str) -> str:
         out_template = str(Path(tmpdir) / "sub")
         cmd = [
             "yt-dlp",
+            "--write-subs",
             "--write-auto-sub",
-            "--sub-lang", "en",
             "--sub-format", "vtt",
             "--skip-download",
             "-o", out_template,
