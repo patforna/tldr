@@ -1,11 +1,13 @@
-"""tldr — Summarise YouTube videos and articles via CLI."""
+"""tldr — Summarise YouTube videos, articles, and PDFs via CLI."""
 
 import argparse
 import re
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse
 
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -27,6 +29,14 @@ def extract_video_id(url: str) -> str | None:
 
 def is_youtube(url: str) -> bool:
     return bool(re.search(r"(youtube\.com|youtu\.be)", url))
+
+
+def is_pdf(source: str) -> bool:
+    """Check if source is a local PDF file or a URL pointing to a PDF."""
+    if Path(source).suffix.lower() == ".pdf":
+        return True
+    parsed = urlparse(source)
+    return parsed.scheme in ("http", "https") and parsed.path.lower().endswith(".pdf")
 
 
 def _fetch_youtube_meta(url: str) -> tuple[str | None, str | None]:
@@ -157,6 +167,73 @@ def fetch_article_text(url: str) -> str:
     return text
 
 
+def fetch_pdf_text(source: str) -> str:
+    """Extract text from a local PDF file or a PDF URL."""
+    import pymupdf
+
+    # Resolve source to a file path
+    if source.startswith(("http://", "https://")):
+        status("downloading PDF...")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_path = Path(tmpdir) / "document.pdf"
+            try:
+                urllib.request.urlretrieve(source, pdf_path)
+            except Exception as e:
+                print(f"error: could not download PDF: {e}", file=sys.stderr)
+                sys.exit(1)
+            return _extract_pdf(pymupdf, pdf_path)
+    else:
+        path = Path(source).expanduser()
+        if not path.is_file():
+            print(f"error: file not found: {source}", file=sys.stderr)
+            sys.exit(1)
+        return _extract_pdf(pymupdf, path)
+
+
+def _extract_pdf(pymupdf, path: Path) -> str:
+    """Open a PDF and extract text with metadata display and truncation."""
+    MAX_CHARS = 500_000
+
+    try:
+        doc = pymupdf.open(str(path))
+    except Exception as e:
+        print(f"error: could not open PDF: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if doc.is_encrypted:
+        print("error: PDF is encrypted/password-protected", file=sys.stderr)
+        sys.exit(1)
+
+    # Display metadata
+    title = doc.metadata.get("title") or None
+    date = None
+    raw_date = doc.metadata.get("creationDate") or ""
+    if m := re.match(r"D:(\d{4})(\d{2})(\d{2})", raw_date):
+        date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    if title:
+        status(f"{title} ({date})" if date else title)
+    status(f"{len(doc)} pages")
+
+    status("extracting text...")
+    texts = []
+    char_count = 0
+    for i, page in enumerate(doc):
+        page_text = page.get_text()
+        if char_count + len(page_text) > MAX_CHARS:
+            texts.append(f"\n\n[Truncated: first {i} of {len(doc)} pages]")
+            break
+        texts.append(page_text)
+        char_count += len(page_text)
+    doc.close()
+
+    text = "\n".join(texts)
+    if not text.strip():
+        print("error: no extractable text in PDF (may be scanned/image-only)", file=sys.stderr)
+        sys.exit(1)
+
+    return text
+
+
 def summarise(text: str, model: str) -> None:
     """Pipe text through claude CLI for summarisation."""
     status("summarising...")
@@ -184,18 +261,22 @@ def summarise(text: str, model: str) -> None:
 def main():
     parser = argparse.ArgumentParser(
         prog="tldr",
-        description="Summarise YouTube videos and articles via Claude.",
+        description="Summarise YouTube videos, articles, and PDFs via Claude.",
     )
-    parser.add_argument("url", help="URL to summarise (YouTube video or article)")
+    parser.add_argument("source", help="YouTube URL, article URL, PDF URL, or local PDF path")
     parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
     args = parser.parse_args()
-    url = re.sub(r'\\([?=&])', r'\1', args.url)  # strip shell escapes
+    source = args.source
+    if source.startswith(("http://", "https://")):
+        source = re.sub(r'\\([?=&])', r'\1', source)  # strip shell escapes
 
-    if is_youtube(url):
-        text = fetch_youtube_transcript(url)
+    if is_pdf(source):
+        text = fetch_pdf_text(source)
+    elif is_youtube(source):
+        text = fetch_youtube_transcript(source)
     else:
-        text = fetch_article_text(url)
+        text = fetch_article_text(source)
 
     if args.keep:
         Path("tldr_content.txt").write_text(text)

@@ -6,4 +6,5 @@ dependencies = [
     "youtube-transcript-api",
     "trafilatura",
     "yt-dlp",
+    "pymupdf>=1.27.2",
 ]

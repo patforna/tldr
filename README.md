@@ -1,15 +1,16 @@
 # tldr
 
-Summarise YouTube videos and articles from the command line via Claude.
+Summarise YouTube videos, articles, and PDFs from the command line via Claude.
 
 ## Usage
 
 ```
-tldr <url> [-m MODEL]
+tldr <source> [-m MODEL]
 ```
 
 - **YouTube**: extracts transcript via `youtube-transcript-api` (falls back to `yt-dlp`)
 - **Articles**: extracts main content via `trafilatura`
+- **PDFs**: extracts text via `pymupdf` (supports URLs and local file paths)
 - Pipes extracted text through `claude -p` for a concise summary with a "watch/read in full" verdict
 
 ### Options
@@ -24,6 +25,8 @@ tldr <url> [-m MODEL]
 ```bash
 tldr "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 tldr "https://example.com/some-article"
+tldr ~/Documents/report.pdf
+tldr "https://example.com/paper.pdf"
 tldr "https://example.com/deep-dive" -m sonnet
 ```
 
