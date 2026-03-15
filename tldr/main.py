@@ -252,7 +252,8 @@ def summarise(text: str, model: str) -> None:
         + text
     )
     result = subprocess.run(
-        ["claude", "-p", "--model", model, prompt],
+        ["claude", "-p", "--model", model],
+        input=prompt,
         text=True,
     )
     sys.exit(result.returncode)
