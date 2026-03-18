@@ -59,7 +59,7 @@ tldr "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 tldr "https://example.com/some-article"
 tldr ~/Documents/report.pdf
 tldr "https://example.com/paper.pdf"
-tldr "https://example.com/deep-dive" -m sonnet
+tldr "https://example.com/deep-dive" --model sonnet
 tldr "https://example.com/some-article" --force   # bypass cache
 ```
 
