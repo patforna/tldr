@@ -268,7 +268,7 @@ def _extract_pdf(pymupdf, path: Path) -> tuple[str, str | None]:
 
 def critique(text: str, model: str) -> None:
     """Research and critique the content's claims and arguments."""
-    status("critiquing (this takes a few minutes while Claude researches claims)...")
+    status("critiquing (check back in a few minutes)...")
     prompt = (
         "You are a critical research analyst. Your task is to research the topic of the following "
         "content in depth, then produce a short critique summary.\n\n"
