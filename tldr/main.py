@@ -291,17 +291,22 @@ def critique(text: str, model: str) -> str:
         "- End with a one-line overall assessment\n\n"
         + text
     )
-    result = subprocess.run(
+    # Stream to terminal while capturing for cache
+    proc = subprocess.Popen(
         ["claude", "-p", "--model", model],
-        input=prompt,
-        capture_output=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
         text=True,
     )
-    if result.returncode != 0:
-        if result.stderr:
-            print(result.stderr, end="", file=sys.stderr)
-        sys.exit(result.returncode)
-    return result.stdout
+    proc.stdin.write(prompt)
+    proc.stdin.close()
+    chunks = []
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+        chunks.append(line)
+    if proc.wait() != 0:
+        sys.exit(proc.returncode)
+    return "".join(chunks)
 
 
 def summarise(text: str, model: str) -> str:
@@ -395,8 +400,7 @@ def main():
             Path("tldr_content.txt").write_text(text)
             status("saved to tldr_content.txt")
         if args.critique:
-            output = critique(text, args.model)
-            print(output, end="")
+            critique(text, args.model)
         else:
             summary = summarise(text, args.model)
             print(summary, end="")
@@ -456,7 +460,6 @@ def main():
     if args.critique:
         output = critique(text, args.model)
         cache.put_critique(source, args.model, output)
-        print(output, end="")
     else:
         summary = summarise(text, args.model)
         if title_line:
