@@ -28,7 +28,7 @@ tldr "https://example.com/paper.pdf"
 tldr "https://example.com/deep-dive" --model sonnet
 tldr "https://example.com/some-article" --force   # bypass cache
 tldr "https://example.com/some-article" -c       # critique instead of summarise
-cat notes.md | tldr                              # summarise from stdin
+cat notes.md | tldr                              # from stdin
 tldr -                                           # read stdin (end with Ctrl-D)
 ```
 
