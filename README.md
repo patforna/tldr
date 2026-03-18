@@ -76,12 +76,17 @@ summary is also regenerated and cached.
 
 ### Critique mode
 
-The `--critique` flag switches from summarisation to critical analysis. Instead of
-producing a summary, Claude assesses the content's complexity and spawns a
-proportional team of subagents to research claims, find counterarguments, and
-check for missing context — then synthesises everything into a concise critique.
+The `--critique` flag switches from summarisation to critical analysis. It runs a
+3-phase pipeline:
 
-Research effort scales automatically with content complexity:
+1. **Assess complexity** — rates the content 1–10 for complexity/contestability
+2. **Research in parallel** — spawns a proportional team of subagents, each
+   researching one specific angle (validating claims, finding counterarguments,
+   checking for missing context)
+3. **Synthesise** — combines all research into a concise critique with bullet-point
+   findings and a one-line overall assessment
+
+The number of research subagents scales with assessed complexity:
 
 | Complexity | Subagents | Use case |
 |------------|-----------|----------|
