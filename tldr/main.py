@@ -370,7 +370,7 @@ def main():
     if use_cache:
         text = cache.get_content(source)
         if text is not None:
-            status("using cached content, re-summarising...")
+            status("using cached content")
 
     # Fetch content if not cached
     if text is None:
