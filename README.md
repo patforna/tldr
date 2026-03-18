@@ -5,8 +5,8 @@ Summarise YouTube videos, articles, and PDFs from the command line via Claude.
 ## Usage
 
 ```
-tldr [source] [--critique] [--model MODEL] [--force] [--keep]
-cat file.txt | tldr [--critique] [--model MODEL]
+tldr [source] [-c] [-m MODEL] [-f] [-k]
+cat file.txt | tldr [-c] [-m MODEL]
 ```
 
 ### Options
