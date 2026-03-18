@@ -5,7 +5,8 @@ Summarise YouTube videos, articles, and PDFs from the command line via Claude.
 ## Usage
 
 ```
-tldr <source> [--critique] [--model MODEL] [--force] [--keep]
+tldr [source] [--critique] [--model MODEL] [--force] [--keep]
+cat file.txt | tldr [--critique] [--model MODEL]
 ```
 
 ### Options
@@ -27,6 +28,9 @@ tldr "https://example.com/paper.pdf"
 tldr "https://example.com/deep-dive" --model sonnet
 tldr "https://example.com/some-article" --force   # bypass cache
 tldr "https://example.com/some-article" -c       # critique instead of summarise
+cat notes.md | tldr                              # summarise from stdin
+cat notes.md | tldr -c                           # critique from stdin
+tldr -                                           # read stdin (end with Ctrl-D)
 ```
 
 Pipe through [Glow](https://github.com/charmbracelet/glow) for prettier terminal rendering:
@@ -40,6 +44,7 @@ tldr "https://example.com/some-article" | glow
 - **YouTube**: extracts transcript via `youtube-transcript-api` (falls back to `yt-dlp`)
 - **Articles**: extracts main content via `trafilatura`
 - **PDFs**: extracts text via `pymupdf` (supports URLs and local file paths)
+- **stdin**: accepts pre-extracted text piped from other commands (no caching, truncated at 500K chars)
 - Pipes extracted text through `claude -p` for a concise summary with a **"watch/read in full" verdict**
 
 ### Caching

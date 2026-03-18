@@ -13,6 +13,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 from tldr import cache
 
+MAX_CHARS = 500_000
+
 
 def status(msg: str) -> None:
     print(f":: {msg}", file=sys.stderr, flush=True)
@@ -225,8 +227,6 @@ def _extract_pdf(pymupdf, path: Path) -> tuple[str, str | None]:
 
     Returns (text, title_line) where title_line may be None.
     """
-    MAX_CHARS = 500_000
-
     try:
         doc = pymupdf.open(str(path))
     except Exception as e:
@@ -332,7 +332,8 @@ def summarise(text: str, model: str) -> str:
 def main():
     parser = argparse.ArgumentParser(
         prog="tldr",
-        description="Summarise YouTube videos, articles, and PDFs via Claude.",
+        description="Summarise YouTube videos, articles, and PDFs via Claude.\n"
+                    "Reads from stdin when no source is given.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
@@ -340,12 +341,15 @@ def main():
             "  tldr 'https://example.com/some-article' --model sonnet\n"
             "  tldr ~/Documents/report.pdf\n"
             "  tldr 'https://example.com/bold-claims' --critique\n"
-            "  tldr 'https://example.com/some-article' --force"
+            "  tldr 'https://example.com/some-article' --force\n"
+            "  cat notes.md | tldr\n"
+            "  tldr -                                          # read stdin (end with Ctrl-D)"
         ),
     )
     parser._positionals.title = "Positional arguments"
     parser._optionals.title = "Options"
-    parser.add_argument("source", help="URL (YouTube, article, PDF) or local PDF path")
+    parser.add_argument("source", nargs="?", default=None,
+                        help="URL (YouTube, article, PDF) or local file path (omit to read stdin)")
     parser.add_argument("-c", "--critique", action="store_true",
                         help="research and critique the content instead of summarising")
     parser.add_argument("-m", "--model", default="opus",
@@ -354,10 +358,45 @@ def main():
                         help="bypass cache — re-download content and regenerate output")
     parser.add_argument("-k", "--keep", action="store_true",
                         help="save extracted content to tldr_content.txt")
-    if len(sys.argv) == 1:
+    args = parser.parse_args()
+
+    has_stdin = not sys.stdin.isatty()
+
+    if args.source is None and not has_stdin:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    args = parser.parse_args()
+
+    # --- stdin path: read piped input, skip extraction and caching ---
+    if args.source is None or args.source == "-":
+        if not has_stdin and args.source != "-":
+            parser.print_help(sys.stderr)
+            sys.exit(1)
+        status("reading stdin...")
+        try:
+            raw = sys.stdin.buffer.read(MAX_CHARS + 1)
+        except KeyboardInterrupt:
+            sys.exit(130)
+        if b"\x00" in raw[:8192]:
+            print("error: stdin appears to contain binary data", file=sys.stderr)
+            sys.exit(1)
+        truncated = len(raw) > MAX_CHARS
+        text = raw[:MAX_CHARS].decode("utf-8", errors="replace")
+        if truncated:
+            status(f"content truncated to {MAX_CHARS // 1000}K chars")
+        if not text.strip():
+            print("error: stdin is empty", file=sys.stderr)
+            sys.exit(1)
+        if args.keep:
+            Path("tldr_content.txt").write_text(text)
+            status("saved to tldr_content.txt")
+        if args.critique:
+            critique(text, args.model)
+        else:
+            summary = summarise(text, args.model)
+            print(summary, end="")
+        return
+
+    # --- source path: URL or local file ---
     source = args.source
     if source.startswith(("http://", "https://")):
         source = re.sub(r'\\([?=&])', r'\1', source)  # strip shell escapes
