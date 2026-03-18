@@ -5,7 +5,7 @@ Summarise YouTube videos, articles, and PDFs from the command line via Claude.
 ## Usage
 
 ```
-tldr <source> [-m MODEL] [-k] [-f]
+tldr <source> [--model MODEL] [--keep] [--force]
 ```
 
 - **YouTube**: extracts transcript via `youtube-transcript-api` (falls back to `yt-dlp`)
@@ -24,24 +24,33 @@ tldr <source> [-m MODEL] [-k] [-f]
 ### Caching
 
 tldr caches both extracted content and generated summaries so repeated lookups
-are instant. Summaries are cached per model, so switching models (e.g. `-m sonnet`)
+are instant. Summaries are cached per model, so switching models (e.g. `--model sonnet`)
 will generate and cache a fresh summary while reusing the cached content.
 
-Cache location follows platform conventions:
+The cache directory follows platform conventions:
 
 | Platform | Directory |
 |----------|-----------|
 | Linux | `$XDG_CACHE_HOME/tldr` (defaults to `~/.cache/tldr`) |
 | macOS | `~/Library/Caches/tldr` |
 
-Each source gets a subdirectory (keyed by a hash of the URL or file path + mtime)
-containing `content.txt` and one `<model>.summary.txt` per model used. To clear
-the cache, simply delete the directory.
+Inside the cache directory, each source gets its own subdirectory named by a hash
+of the URL (or file path + modification time for local files):
+
+```
+~/.cache/tldr/
+└── 3a7b9c1e4f2d8a06/        # hash of the source URL
+    ├── content.txt           # extracted text
+    ├── opus.summary.txt      # summary generated with --model opus
+    └── sonnet.summary.txt    # summary generated with --model sonnet
+```
+
+To clear the entire cache, delete the directory (e.g. `rm -rf ~/.cache/tldr`).
 
 For local PDF files, the cache automatically invalidates when the file is modified.
 
-Use `-f` / `--force` to skip the cache entirely and re-download and re-summarise
-from scratch (the new results will still be written to the cache).
+Use `--force` to skip the cache entirely and re-download and re-summarise from
+scratch. The fresh results are still written back to the cache.
 
 ## Examples
 
@@ -51,7 +60,7 @@ tldr "https://example.com/some-article"
 tldr ~/Documents/report.pdf
 tldr "https://example.com/paper.pdf"
 tldr "https://example.com/deep-dive" -m sonnet
-tldr "https://example.com/some-article" -f   # bypass cache
+tldr "https://example.com/some-article" --force   # bypass cache
 ```
 
 ## Install
