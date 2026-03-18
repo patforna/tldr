@@ -21,15 +21,15 @@ cat file.txt | tldr [-c] [-m MODEL]
 ### Examples
 
 ```bash
-tldr "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-tldr "https://example.com/some-article"
-tldr ~/Documents/report.pdf
-tldr "https://example.com/paper.pdf"
-tldr "https://example.com/deep-dive" --model sonnet
-tldr "https://example.com/some-article" --force   # bypass cache
-tldr "https://example.com/some-article" -c       # critique instead of summarise
-cat notes.md | tldr                              # from stdin
-tldr -                                           # read stdin (end with Ctrl-D)
+tldr "https://www.youtube.com/watch?v=dQw4w9WgXcQ"   # youtube
+tldr "https://example.com/some-article"              # article
+tldr ~/Documents/report.pdf                          # local pdf
+tldr "https://example.com/paper.pdf"                 # remote pdf
+tldr "https://example.com/deep-dive" --model sonnet  # pick model
+tldr "https://example.com/some-article" --force      # bypass cache
+tldr "https://example.com/some-article" -c           # critique
+cat notes.md | tldr                                  # stdin
+tldr -                                               # stdin (end with Ctrl-D)
 ```
 
 Pipe through [Glow](https://github.com/charmbracelet/glow) for prettier terminal rendering:
