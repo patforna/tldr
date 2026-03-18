@@ -266,7 +266,7 @@ def _extract_pdf(pymupdf, path: Path) -> tuple[str, str | None]:
     return text, title_line
 
 
-def critique(text: str, model: str) -> None:
+def critique(text: str, model: str) -> str:
     """Research and critique the content's claims and arguments."""
     status("critiquing (check back in a few minutes)...")
     prompt = (
@@ -294,9 +294,14 @@ def critique(text: str, model: str) -> None:
     result = subprocess.run(
         ["claude", "-p", "--model", model],
         input=prompt,
+        capture_output=True,
         text=True,
     )
-    sys.exit(result.returncode)
+    if result.returncode != 0:
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        sys.exit(result.returncode)
+    return result.stdout
 
 
 def summarise(text: str, model: str) -> str:
@@ -390,7 +395,8 @@ def main():
             Path("tldr_content.txt").write_text(text)
             status("saved to tldr_content.txt")
         if args.critique:
-            critique(text, args.model)
+            output = critique(text, args.model)
+            print(output, end="")
         else:
             summary = summarise(text, args.model)
             print(summary, end="")
@@ -403,15 +409,19 @@ def main():
 
     use_cache = not args.force
 
-    # Critique mode skips the summary cache shortcut (but still uses the content
-    # cache below to avoid re-downloading).  We intentionally don't feed the
-    # cached summary into the critique prompt either — it would anchor the
-    # critique to whatever the summary highlighted and away from what it missed.
-    if use_cache and not args.critique:
-        cached_summary = cache.get_summary(source, args.model)
-        if cached_summary is not None:
-            status("using cached summary")
-            print(cached_summary, end="")
+    # Check for cached output (summary or critique) before doing any work.
+    # We intentionally don't feed the cached summary into the critique prompt —
+    # it would anchor the critique to whatever the summary highlighted.
+    if use_cache:
+        if args.critique:
+            cached = cache.get_critique(source, args.model)
+            label = "critique"
+        else:
+            cached = cache.get_summary(source, args.model)
+            label = "summary"
+        if cached is not None:
+            status(f"using cached {label}")
+            print(cached, end="")
             if args.keep:
                 cached_content = cache.get_content(source)
                 if cached_content is not None:
@@ -444,7 +454,9 @@ def main():
         status("saved to tldr_content.txt")
 
     if args.critique:
-        critique(text, args.model)
+        output = critique(text, args.model)
+        cache.put_critique(source, args.model, output)
+        print(output, end="")
     else:
         summary = summarise(text, args.model)
         if title_line:

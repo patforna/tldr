@@ -80,3 +80,18 @@ def put_summary(source: str, model: str, text: str) -> None:
     entry = _entry_dir(source)
     entry.mkdir(parents=True, exist_ok=True)
     (entry / f"{_safe_model_name(model)}.summary.txt").write_text(text)
+
+
+def get_critique(source: str, model: str) -> str | None:
+    """Return cached critique for *source* + *model*, or None on miss."""
+    critique_file = _entry_dir(source) / f"{_safe_model_name(model)}.critique.txt"
+    if critique_file.is_file():
+        return critique_file.read_text()
+    return None
+
+
+def put_critique(source: str, model: str, text: str) -> None:
+    """Store a critique for *source* + *model* in the cache."""
+    entry = _entry_dir(source)
+    entry.mkdir(parents=True, exist_ok=True)
+    (entry / f"{_safe_model_name(model)}.critique.txt").write_text(text)
