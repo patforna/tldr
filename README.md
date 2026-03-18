@@ -35,42 +35,6 @@ Pipe through [Glow](https://github.com/charmbracelet/glow) for prettier terminal
 tldr "https://example.com/some-article" | glow
 ```
 
-### Critique mode
-
-The `--critique` flag switches from summarisation to critical analysis. It runs a
-3-phase pipeline:
-
-1. **Assess complexity** — rates the content 1–10 for complexity/contestability
-2. **Research in parallel** — spawns a proportional team of subagents, each
-   researching one specific angle (validating claims, finding counterarguments,
-   checking for missing context)
-3. **Synthesise** — combines all research into a concise critique with bullet-point
-   findings and a one-line overall assessment
-
-The number of research subagents scales with assessed complexity:
-
-| Complexity | Subagents | Use case |
-|------------|-----------|----------|
-| 1–2 | 0 | Trivial / uncontested content — no research needed |
-| 3–5 | 2–3 | Moderate claims needing basic validation |
-| 6–8 | 4–7 | Complex or contested topics requiring multiple angles |
-| 9–10 | 8–10 | Highly complex content needing thorough investigation |
-
-The prompt instructs Claude not to manufacture nitpicks — if the content is accurate
-and uncontested, the critique will say so plainly.
-
-Typical workflow — summarise first, then critique if sceptical:
-
-```bash
-tldr "https://example.com/bold-claims"           # quick summary
-tldr "https://example.com/bold-claims" -c        # in-depth critique (reuses cached content)
-tldr "https://example.com/bold-claims" -c -f     # re-download and critique from scratch
-```
-
-Critique mode reuses the cached content (so there's no re-download), but it works
-from the raw source text — not the summary. This avoids anchoring the critique to
-whatever the summary chose to highlight or omit.
-
 ## How it works
 
 - **YouTube**: extracts transcript via `youtube-transcript-api` (falls back to `yt-dlp`)
@@ -109,6 +73,42 @@ For local PDF files, the cache automatically invalidates when the file is modifi
 Use `--force` to skip the cache entirely and re-download content from scratch.
 The fresh content is still written back to the cache. In summary mode, a new
 summary is also regenerated and cached.
+
+### Critique mode
+
+The `--critique` flag switches from summarisation to critical analysis. It runs a
+3-phase pipeline:
+
+1. **Assess complexity** — rates the content 1–10 for complexity/contestability
+2. **Research in parallel** — spawns a proportional team of subagents, each
+   researching one specific angle (validating claims, finding counterarguments,
+   checking for missing context)
+3. **Synthesise** — combines all research into a concise critique with bullet-point
+   findings and a one-line overall assessment
+
+The number of research subagents scales with assessed complexity:
+
+| Complexity | Subagents | Use case |
+|------------|-----------|----------|
+| 1–2 | 0 | Trivial / uncontested content — no research needed |
+| 3–5 | 2–3 | Moderate claims needing basic validation |
+| 6–8 | 4–7 | Complex or contested topics requiring multiple angles |
+| 9–10 | 8–10 | Highly complex content needing thorough investigation |
+
+The prompt instructs Claude not to manufacture nitpicks — if the content is accurate
+and uncontested, the critique will say so plainly.
+
+Typical workflow — summarise first, then critique if sceptical:
+
+```bash
+tldr "https://example.com/bold-claims"           # quick summary
+tldr "https://example.com/bold-claims" -c        # in-depth critique (reuses cached content)
+tldr "https://example.com/bold-claims" -c -f     # re-download and critique from scratch
+```
+
+Critique mode reuses the cached content (so there's no re-download), but it works
+from the raw source text — not the summary. This avoids anchoring the critique to
+whatever the summary chose to highlight or omit.
 
 ## Install
 
