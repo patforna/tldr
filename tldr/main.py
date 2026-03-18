@@ -1,13 +1,11 @@
 """tldr — Summarise YouTube videos, articles, and PDFs via CLI."""
 
 import argparse
-import json
 import re
 import subprocess
 import sys
 import tempfile
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -268,117 +266,36 @@ def _extract_pdf(pymupdf, path: Path) -> tuple[str, str | None]:
     return text, title_line
 
 
-CLAUDE_TIMEOUT = 300
-
-
-def _run_claude(prompt: str, model: str) -> str:
-    """Run claude CLI and return its stdout."""
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", model],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=CLAUDE_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
-        print(f"error: claude timed out after {CLAUDE_TIMEOUT}s", file=sys.stderr)
-        sys.exit(1)
-    if result.returncode != 0:
-        print(f"error: claude failed: {result.stderr}", file=sys.stderr)
-        sys.exit(1)
-    return result.stdout.strip()
-
-
 def critique(text: str, model: str) -> None:
     """Research and critique the content's claims and arguments."""
-    # Phase 1: Assess complexity (cheap model)
-    status("assessing complexity...")
-    assessment = _run_claude(
-        "Analyze the following content and respond with ONLY valid JSON (no markdown fences).\n"
-        "Return an object with:\n"
-        '- "complexity": integer 1-10 rating of how complex, nuanced, or contestable the topic is\n'
-        '- "tasks": a list of specific research tasks to validate or critique the content.\n'
-        "  Each task is a short string describing one angle to research.\n"
-        "  Scale the number of tasks to the complexity:\n"
-        "    complexity 1-2: empty list (content is trivial/uncontested)\n"
-        "    complexity 3-4: 1-2 tasks\n"
-        "    complexity 5-6: 3-4 tasks\n"
-        "    complexity 7-8: 5-7 tasks\n"
-        "    complexity 9-10: 8-10 tasks\n\n"
-        "Content:\n" + text,
-        "haiku",
-    )
-
-    try:
-        parsed = json.loads(assessment)
-        complexity = parsed["complexity"]
-        tasks = parsed["tasks"]
-    except (json.JSONDecodeError, KeyError):
-        status("warning: could not parse complexity assessment, proceeding without research")
-        complexity = 0
-        tasks = []
-
-    tasks = tasks[:10]  # hard cap regardless of model output
-    status(f"complexity {complexity}/10, {len(tasks)} research {'task' if len(tasks) == 1 else 'tasks'}")
-
-    # Phase 2: Research tasks in parallel (each is an independent claude call)
-    findings = {}
-    if tasks:
-        status("researching...")
-
-        def research(task: str) -> tuple[str, str]:
-            result = _run_claude(
-                "You are a research analyst. Critically evaluate one specific aspect "
-                "of a piece of content. Provide evidence, counterarguments, alternative "
-                "perspectives, and an assessment of accuracy.\n\n"
-                f"Research task: {task}\n\n"
-                "Original content for context:\n" + text,
-                model,
-            )
-            return task, result
-
-        with ThreadPoolExecutor(max_workers=min(len(tasks), 10)) as pool:
-            futures = [pool.submit(research, t) for t in tasks]
-            for i, future in enumerate(as_completed(futures), 1):
-                task, result = future.result()
-                findings[task] = result
-                status(f"research {i}/{len(tasks)} done")
-
-    # Phase 3: Synthesise critique
-    status("synthesising critique...")
-    research_block = ""
-    if findings:
-        sections = []
-        for task, result in findings.items():
-            sections.append(f"### {task}\n{result}")
-        research_block = "\n\n---\n\n".join(sections)
-
-    synthesis_prompt = (
-        "You are a critical analyst. Based on the original content and research findings below, "
-        "write a short, focused critique summary.\n\n"
-        "Guidelines:\n"
+    status("critiquing...")
+    prompt = (
+        "You are a critical research analyst. Your task is to research the topic of the following "
+        "content in depth, then produce a short critique summary.\n\n"
+        "First, assess the complexity and contestability of the content on a 1-10 scale. "
+        "Then scale your research effort proportionally:\n"
+        "- For trivial or uncontested content (1-2): no research needed, just confirm it looks legit\n"
+        "- For moderate content (3-5): use a team of 2-3 subagents to research key claims in parallel\n"
+        "- For complex or contested content (6-8): use a team of 4-7 subagents to research "
+        "different angles in parallel\n"
+        "- For highly complex content (9-10): use a team of 8-10 subagents to thoroughly research "
+        "all major claims, perspectives, and counterarguments in parallel\n\n"
+        "Each subagent should research one specific angle — validating a claim, finding "
+        "counterarguments, checking for missing context, or providing alternative perspectives.\n\n"
+        "After gathering all research, synthesize a short critique summary:\n"
         "- Use bullet points for individual findings\n"
         "- Validate or challenge key claims based on the research\n"
         "- Note any important alternative perspectives or missing context\n"
         "- If the content is largely accurate and uncontested, say so plainly — "
         "do NOT force criticism or manufacture nitpicks\n"
         "- End with a one-line overall assessment\n\n"
-        "ORIGINAL CONTENT:\n" + text + "\n\n"
+        + text
     )
-    if research_block:
-        synthesis_prompt += "RESEARCH FINDINGS:\n" + research_block + "\n"
-
-    try:
-        result = subprocess.run(
-            ["claude", "-p", "--model", model],
-            input=synthesis_prompt,
-            text=True,
-            timeout=CLAUDE_TIMEOUT,
-        )
-    except subprocess.TimeoutExpired:
-        print(f"\nerror: claude timed out after {CLAUDE_TIMEOUT}s", file=sys.stderr)
-        sys.exit(1)
+    result = subprocess.run(
+        ["claude", "-p", "--model", model],
+        input=prompt,
+        text=True,
+    )
     sys.exit(result.returncode)
 
 

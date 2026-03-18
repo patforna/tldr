@@ -76,24 +76,18 @@ summary is also regenerated and cached.
 
 ### Critique mode
 
-The `--critique` flag switches from summarisation to critical analysis. It runs a
-3-phase pipeline:
+The `--critique` flag switches from summarisation to critical analysis. Instead of
+producing a summary, Claude assesses the content's complexity and spawns a
+proportional team of subagents to research claims, find counterarguments, and
+check for missing context — then synthesises everything into a concise critique.
 
-1. **Assess complexity** (via haiku, fast and cheap) — rates the content 1–10 for
-   complexity/contestability and generates a proportional number of research tasks
-2. **Research in parallel** — runs each research task as an independent `claude -p`
-   call via a thread pool, producing genuinely independent perspectives
-3. **Synthesise** — combines all research findings into a concise critique with
-   bullet-point findings and a one-line overall assessment
+Research effort scales automatically with content complexity:
 
-The number of parallel research tasks scales with assessed complexity:
-
-| Complexity | Research tasks | Use case |
-|------------|---------------|----------|
-| 1–2 | 0 | Trivial / uncontested content — skip straight to synthesis |
-| 3–4 | 1–2 | Moderate claims needing basic validation |
-| 5–6 | 3–4 | Nuanced topics with multiple angles |
-| 7–8 | 5–7 | Complex or contested content |
+| Complexity | Subagents | Use case |
+|------------|-----------|----------|
+| 1–2 | 0 | Trivial / uncontested content — no research needed |
+| 3–5 | 2–3 | Moderate claims needing basic validation |
+| 6–8 | 4–7 | Complex or contested topics requiring multiple angles |
 | 9–10 | 8–10 | Highly complex content needing thorough investigation |
 
 The prompt instructs Claude not to manufacture nitpicks — if the content is accurate
