@@ -266,6 +266,39 @@ def _extract_pdf(pymupdf, path: Path) -> tuple[str, str | None]:
     return text, title_line
 
 
+def critique(text: str, model: str) -> None:
+    """Research and critique the content's claims and arguments."""
+    status("critiquing (check back in a few minutes)...")
+    prompt = (
+        "You are a critical research analyst. Your task is to research the topic of the following "
+        "content in depth, then produce a short critique summary.\n\n"
+        "First, assess the complexity and contestability of the content on a 1-10 scale. "
+        "Then scale your research effort proportionally:\n"
+        "- For trivial or uncontested content (1-2): no research needed, just confirm it looks legit\n"
+        "- For moderate content (3-5): use a team of 2-3 subagents to research key claims in parallel\n"
+        "- For complex or contested content (6-8): use a team of 4-7 subagents to research "
+        "different angles in parallel\n"
+        "- For highly complex content (9-10): use a team of 8-10 subagents to thoroughly research "
+        "all major claims, perspectives, and counterarguments in parallel\n\n"
+        "Each subagent should research one specific angle — validating a claim, finding "
+        "counterarguments, checking for missing context, or providing alternative perspectives.\n\n"
+        "After gathering all research, synthesize a short critique summary:\n"
+        "- Use bullet points for individual findings\n"
+        "- Validate or challenge key claims based on the research\n"
+        "- Note any important alternative perspectives or missing context\n"
+        "- If the content is largely accurate and uncontested, say so plainly — "
+        "do NOT force criticism or manufacture nitpicks\n"
+        "- End with a one-line overall assessment\n\n"
+        + text
+    )
+    result = subprocess.run(
+        ["claude", "-p", "--model", model],
+        input=prompt,
+        text=True,
+    )
+    sys.exit(result.returncode)
+
+
 def summarise(text: str, model: str) -> str:
     """Pipe text through claude CLI for summarisation and return the summary."""
     status("summarising...")
@@ -304,7 +337,8 @@ def main():
     parser.add_argument("source", help="YouTube URL, article URL, PDF URL, or local PDF path")
     parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
-    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download/re-summarise (results are still cached)")
+    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download content (results are still cached)")
+    parser.add_argument("-c", "--critique", action="store_true", help="research and critique the content's claims")
     args = parser.parse_args()
     source = args.source
     if source.startswith(("http://", "https://")):
@@ -312,8 +346,11 @@ def main():
 
     use_cache = not args.force
 
-    # Check for cached summary first (fastest path)
-    if use_cache:
+    # Critique mode skips the summary cache shortcut (but still uses the content
+    # cache below to avoid re-downloading).  We intentionally don't feed the
+    # cached summary into the critique prompt either — it would anchor the
+    # critique to whatever the summary highlighted and away from what it missed.
+    if use_cache and not args.critique:
         cached_summary = cache.get_summary(source, args.model)
         if cached_summary is not None:
             status("using cached summary")
@@ -333,7 +370,7 @@ def main():
     if use_cache:
         text = cache.get_content(source)
         if text is not None:
-            status("using cached content, re-summarising...")
+            status("using cached content")
 
     # Fetch content if not cached
     if text is None:
@@ -349,11 +386,14 @@ def main():
         Path("tldr_content.txt").write_text(text)
         status("saved to tldr_content.txt")
 
-    summary = summarise(text, args.model)
-    if title_line:
-        summary = f"# {title_line}\n\n{summary}"
-    cache.put_summary(source, args.model, summary)
-    print(summary, end="")
+    if args.critique:
+        critique(text, args.model)
+    else:
+        summary = summarise(text, args.model)
+        if title_line:
+            summary = f"# {title_line}\n\n{summary}"
+        cache.put_summary(source, args.model, summary)
+        print(summary, end="")
 
 
 if __name__ == "__main__":
