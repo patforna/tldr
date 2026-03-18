@@ -5,17 +5,17 @@ Summarise YouTube videos, articles, and PDFs from the command line via Claude.
 ## Usage
 
 ```
-tldr <source> [--model MODEL] [--keep] [--force] [--critique]
+tldr <source> [--critique] [--model MODEL] [--force] [--keep]
 ```
 
 ### Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-m`, `--model` | `opus` | Claude model (`haiku`, `sonnet`, `opus`) |
-| `-k`, `--keep` | | Save extracted full content to `tldr_content.txt` |
-| `-f`, `--force` | | Bypass cache — re-download content (works with both summary and critique) |
 | `-c`, `--critique` | | Research and critique the content instead of summarising |
+| `-m`, `--model` | `opus` | Claude model (`haiku`, `sonnet`, `opus`) |
+| `-f`, `--force` | | Bypass cache — re-download content and regenerate output |
+| `-k`, `--keep` | | Save extracted content to `tldr_content.txt` |
 
 ### Examples
 
@@ -40,7 +40,7 @@ tldr "https://example.com/some-article" | glow
 - **YouTube**: extracts transcript via `youtube-transcript-api` (falls back to `yt-dlp`)
 - **Articles**: extracts main content via `trafilatura`
 - **PDFs**: extracts text via `pymupdf` (supports URLs and local file paths)
-- Pipes extracted text through `claude -p` for a concise summary with a **"watch/read in full"** verdict
+- Pipes extracted text through `claude -p` for a concise summary with a **"watch/read in full" verdict**
 
 ### Caching
 

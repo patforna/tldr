@@ -333,12 +333,30 @@ def main():
     parser = argparse.ArgumentParser(
         prog="tldr",
         description="Summarise YouTube videos, articles, and PDFs via Claude.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  tldr 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'\n"
+            "  tldr 'https://example.com/some-article' --model sonnet\n"
+            "  tldr ~/Documents/report.pdf\n"
+            "  tldr 'https://example.com/bold-claims' --critique\n"
+            "  tldr 'https://example.com/some-article' --force"
+        ),
     )
-    parser.add_argument("source", help="YouTube URL, article URL, PDF URL, or local PDF path")
-    parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
-    parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
-    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download content (results are still cached)")
-    parser.add_argument("-c", "--critique", action="store_true", help="research and critique the content's claims")
+    parser._positionals.title = "Positional arguments"
+    parser._optionals.title = "Options"
+    parser.add_argument("source", help="URL (YouTube, article, PDF) or local PDF path")
+    parser.add_argument("-c", "--critique", action="store_true",
+                        help="research and critique the content instead of summarising")
+    parser.add_argument("-m", "--model", default="opus",
+                        help="Claude model: haiku, sonnet, opus (default: opus)")
+    parser.add_argument("-f", "--force", action="store_true",
+                        help="bypass cache — re-download content and regenerate output")
+    parser.add_argument("-k", "--keep", action="store_true",
+                        help="save extracted content to tldr_content.txt")
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     args = parser.parse_args()
     source = args.source
     if source.startswith(("http://", "https://")):
