@@ -337,7 +337,7 @@ def main():
     parser.add_argument("source", help="YouTube URL, article URL, PDF URL, or local PDF path")
     parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
-    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download/re-summarise (results are still cached)")
+    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download content (results are still cached)")
     parser.add_argument("-c", "--critique", action="store_true", help="research and critique the content's claims")
     args = parser.parse_args()
     source = args.source
