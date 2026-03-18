@@ -3,7 +3,7 @@
 import hashlib
 import os
 import platform
-import sys
+import re
 from pathlib import Path
 
 
@@ -29,12 +29,15 @@ def _cache_key(source: str) -> str:
     For local files, the key incorporates the absolute path and modification
     time so the cache auto-invalidates when the file changes.
     """
-    path = Path(source).expanduser()
-    if path.is_file():
-        mtime = path.stat().st_mtime
-        identity = f"{path.resolve()}:{mtime}"
-    else:
+    if source.startswith(("http://", "https://")):
         identity = source
+    else:
+        path = Path(source).expanduser()
+        try:
+            mtime = path.stat().st_mtime
+            identity = f"{path.resolve()}:{mtime}"
+        except OSError:
+            identity = source
     return hashlib.sha256(identity.encode()).hexdigest()[:16]
 
 
@@ -58,9 +61,14 @@ def put_content(source: str, text: str) -> None:
     (entry / "content.txt").write_text(text)
 
 
+def _safe_model_name(model: str) -> str:
+    """Sanitize model name for use in filenames (prevents path traversal)."""
+    return re.sub(r"[^\w.-]", "_", model)
+
+
 def get_summary(source: str, model: str) -> str | None:
     """Return cached summary for *source* + *model*, or None on miss."""
-    summary_file = _entry_dir(source) / f"{model}.summary.txt"
+    summary_file = _entry_dir(source) / f"{_safe_model_name(model)}.summary.txt"
     if summary_file.is_file():
         return summary_file.read_text()
     return None
@@ -70,9 +78,4 @@ def put_summary(source: str, model: str, text: str) -> None:
     """Store a summary for *source* + *model* in the cache."""
     entry = _entry_dir(source)
     entry.mkdir(parents=True, exist_ok=True)
-    (entry / f"{model}.summary.txt").write_text(text)
-
-
-def cache_location() -> Path:
-    """Return the top-level cache directory (for display/diagnostics)."""
-    return _cache_dir()
+    (entry / f"{_safe_model_name(model)}.summary.txt").write_text(text)

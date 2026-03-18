@@ -274,7 +274,7 @@ def main():
     parser.add_argument("source", help="YouTube URL, article URL, PDF URL, or local PDF path")
     parser.add_argument("-m", "--model", default="opus", help="claude model to use (default: opus)")
     parser.add_argument("-k", "--keep", action="store_true", help="save extracted full content to a file")
-    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download/re-summarise")
+    parser.add_argument("-f", "--force", action="store_true", help="bypass cache and re-download/re-summarise (results are still cached)")
     args = parser.parse_args()
     source = args.source
     if source.startswith(("http://", "https://")):
@@ -286,13 +286,15 @@ def main():
     if use_cache:
         cached_summary = cache.get_summary(source, args.model)
         if cached_summary is not None:
-            status("cache hit (summary)")
+            status("using cached summary")
             print(cached_summary, end="")
             if args.keep:
                 cached_content = cache.get_content(source)
                 if cached_content is not None:
                     Path("tldr_content.txt").write_text(cached_content)
                     status("saved to tldr_content.txt")
+                else:
+                    status("cached content unavailable, use -f to re-download")
             return
 
     # Check for cached content (avoids re-downloading)
@@ -300,7 +302,7 @@ def main():
     if use_cache:
         text = cache.get_content(source)
         if text is not None:
-            status("cache hit (content)")
+            status("using cached content, re-summarising...")
 
     # Fetch content if not cached
     if text is None:
