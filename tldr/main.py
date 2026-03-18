@@ -346,7 +346,10 @@ def main():
 
     use_cache = not args.force
 
-    # Check for cached summary first (fastest path) — only for summarise mode
+    # Critique mode skips the summary cache shortcut (but still uses the content
+    # cache below to avoid re-downloading).  We intentionally don't feed the
+    # cached summary into the critique prompt either — it would anchor the
+    # critique to whatever the summary highlighted and away from what it missed.
     if use_cache and not args.critique:
         cached_summary = cache.get_summary(source, args.model)
         if cached_summary is not None:
