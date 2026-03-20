@@ -6,7 +6,6 @@ Summarise YouTube videos, articles, and PDFs from the command line via Claude.
 
 ```
 tldr [source] [-c] [-m MODEL] [-f] [-k]
-cat file.txt | tldr [-c] [-m MODEL]
 ```
 
 ### Options
