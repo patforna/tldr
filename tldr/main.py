@@ -292,22 +292,31 @@ def critique(text: str, model: str) -> str:
         "- End with a one-line overall assessment\n\n"
         + text
     )
-    # claude -p with the default text output emits nothing until the whole run
-    # finishes — and the critique prompt spawns subagents that web-research for
-    # minutes, so the terminal would sit silent the entire time (looks hung).
-    # Use stream-json to surface live progress, and allow the research tools
-    # explicitly (headless mode permission-gates them, blocking the research).
+    # Research needs the Task/web tools, which headless mode permission-gates.
+    return _run_claude(prompt, model, allowed_tools="Task WebSearch WebFetch")
+
+
+def _run_claude(prompt: str, model: str, allowed_tools: str | None = None) -> str:
+    """Run `claude -p`, streaming assistant text to the terminal live and
+    surfacing tool activity as status lines. Returns the final text.
+
+    With the default output format claude -p buffers its entire response, so a
+    long run (especially critique, which spawns research subagents) prints
+    nothing until it finishes — it looks hung. stream-json with partial
+    messages gives token-by-token output and live progress instead.
+    """
+    cmd = ["claude", "-p", "--model", model,
+           "--output-format", "stream-json", "--verbose",
+           "--include-partial-messages"]
+    if allowed_tools:
+        cmd += ["--allowedTools", allowed_tools]
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", model,
-         "--output-format", "stream-json", "--verbose",
-         "--allowedTools", "Task WebSearch WebFetch"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        text=True,
+        cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
     )
     proc.stdin.write(prompt)
     proc.stdin.close()
     final = ""
+    streamed = False
     for line in proc.stdout:
         line = line.strip()
         if not line:
@@ -317,7 +326,15 @@ def critique(text: str, model: str) -> str:
         except json.JSONDecodeError:
             continue
         etype = event.get("type")
-        if etype == "assistant":
+        if etype == "stream_event":
+            ev = event.get("event", {})
+            if (ev.get("type") == "content_block_delta"
+                    and event.get("parent_tool_use_id") is None):
+                delta = ev.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    print(delta.get("text", ""), end="", flush=True)
+                    streamed = True
+        elif etype == "assistant":
             for block in event.get("message", {}).get("content", []):
                 if block.get("type") == "tool_use":
                     _report_tool(block)
@@ -325,12 +342,15 @@ def critique(text: str, model: str) -> str:
             final = event.get("result") or ""
     if proc.wait() != 0:
         sys.exit(proc.returncode)
-    print(final)
+    if streamed:
+        print()  # terminate the streamed line
+    elif final:
+        print(final)
     return final
 
 
 def _report_tool(block: dict) -> None:
-    """Emit a progress status line for a tool_use event during critique."""
+    """Emit a progress status line for a tool_use event during a claude run."""
     name = block.get("name", "")
     inp = block.get("input") or {}
     if name == "Task":
@@ -359,17 +379,7 @@ def summarise(text: str, model: str) -> str:
         "If the summary is sufficient (the common case), do not add this line at all.\n\n"
         + text
     )
-    result = subprocess.run(
-        ["claude", "-p", "--model", model],
-        input=prompt,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        if result.stderr:
-            print(result.stderr, end="", file=sys.stderr)
-        sys.exit(result.returncode)
-    return result.stdout
+    return _run_claude(prompt, model)
 
 
 def main():
@@ -435,8 +445,7 @@ def main():
         if args.critique:
             critique(text, args.model)
         else:
-            summary = summarise(text, args.model)
-            print(summary, end="")
+            summarise(text, args.model)
         return
 
     # --- source path: URL or local file ---
@@ -494,11 +503,12 @@ def main():
         output = critique(text, args.model)
         cache.put_critique(source, args.model, output)
     else:
+        if title_line:
+            print(f"# {title_line}\n")
         summary = summarise(text, args.model)
         if title_line:
             summary = f"# {title_line}\n\n{summary}"
         cache.put_summary(source, args.model, summary)
-        print(summary, end="")
 
 
 if __name__ == "__main__":
