@@ -1,6 +1,7 @@
 """tldr — Summarise YouTube videos, articles, and PDFs via CLI."""
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -275,11 +276,11 @@ def critique(text: str, model: str) -> str:
         "First, assess the complexity and contestability of the content on a 1-10 scale. "
         "Then scale your research effort proportionally:\n"
         "- For trivial or uncontested content (1-2): no research needed, just confirm it looks legit\n"
-        "- For moderate content (3-5): use a team of 2-3 subagents to research key claims in parallel\n"
-        "- For complex or contested content (6-8): use a team of 4-7 subagents to research "
+        "- For moderate content (3-5): use 1-2 subagents to research key claims in parallel\n"
+        "- For complex or contested content (6-8): use a team of 2-3 subagents to research "
         "different angles in parallel\n"
-        "- For highly complex content (9-10): use a team of 8-10 subagents to thoroughly research "
-        "all major claims, perspectives, and counterarguments in parallel\n\n"
+        "- For highly complex content (9-10): use a team of 3-4 subagents to thoroughly research "
+        "the major claims, perspectives, and counterarguments in parallel\n\n"
         "Each subagent should research one specific angle — validating a claim, finding "
         "counterarguments, checking for missing context, or providing alternative perspectives.\n\n"
         "After gathering all research, synthesize a short critique summary:\n"
@@ -291,22 +292,54 @@ def critique(text: str, model: str) -> str:
         "- End with a one-line overall assessment\n\n"
         + text
     )
-    # Stream to terminal while capturing for cache
+    # claude -p with the default text output emits nothing until the whole run
+    # finishes — and the critique prompt spawns subagents that web-research for
+    # minutes, so the terminal would sit silent the entire time (looks hung).
+    # Use stream-json to surface live progress, and allow the research tools
+    # explicitly (headless mode permission-gates them, blocking the research).
     proc = subprocess.Popen(
-        ["claude", "-p", "--model", model],
+        ["claude", "-p", "--model", model,
+         "--output-format", "stream-json", "--verbose",
+         "--allowedTools", "Task WebSearch WebFetch"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         text=True,
     )
     proc.stdin.write(prompt)
     proc.stdin.close()
-    chunks = []
+    final = ""
     for line in proc.stdout:
-        print(line, end="", flush=True)
-        chunks.append(line)
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        etype = event.get("type")
+        if etype == "assistant":
+            for block in event.get("message", {}).get("content", []):
+                if block.get("type") == "tool_use":
+                    _report_tool(block)
+        elif etype == "result":
+            final = event.get("result") or ""
     if proc.wait() != 0:
         sys.exit(proc.returncode)
-    return "".join(chunks)
+    print(final)
+    return final
+
+
+def _report_tool(block: dict) -> None:
+    """Emit a progress status line for a tool_use event during critique."""
+    name = block.get("name", "")
+    inp = block.get("input") or {}
+    if name == "Task":
+        detail = inp.get("description") or inp.get("subagent_type") or "subagent"
+        status(f"researching: {_truncate(detail)}")
+    elif name == "WebSearch":
+        status(f"searching: {_truncate(inp.get('query', ''))}")
+    elif name == "WebFetch":
+        status(f"reading: {_truncate(inp.get('url', ''))}")
 
 
 def summarise(text: str, model: str) -> str:
