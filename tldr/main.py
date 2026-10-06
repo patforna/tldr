@@ -306,6 +306,7 @@ def _run_claude(prompt: str, model: str, allowed_tools: str | None = None) -> st
     messages gives token-by-token output and live progress instead.
     """
     cmd = ["claude", "-p", "--model", model,
+           "--settings", '{"disableAllHooks": true}',
            "--output-format", "stream-json", "--verbose",
            "--include-partial-messages"]
     if allowed_tools:
